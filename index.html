@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>PetWise Pro - 寵物產品管理系統</title>
     
-    <!-- 載入外部資源 -->
+    <!-- 載入外部資源 (UMD 版本最穩定) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -61,6 +61,7 @@
 
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
+        // 確保圖示從 LucideReact 全域變數取得，防止 undefined 錯誤
         const { 
             ShoppingCart, History, Package, Plus, Trash2, Search, 
             LayoutGrid, ClipboardCheck, LogOut, ShieldCheck, 
@@ -68,9 +69,8 @@
         } = LucideReact;
 
         const ADMIN_PASSWORD = '0000';
-        const STORAGE_KEY = 'petwise_pro_standalone_final';
+        const STORAGE_KEY = 'petwise_pro_standalone_final_v2';
 
-        // --- 原始商品資料 ---
         const RAW_DATA = [
             // 風乾零食
             { category: "風乾零食", name: "貓咪抗拒不了貓草餅乾 catnip cookie", wholesalePrice: 163, retailPrice: 250 },
@@ -189,7 +189,7 @@
                     setUserRole('customer');
                     setView('order');
                 } else {
-                    alert('請輸入使用者名稱');
+                    alert('請輸入姓名或管理員密碼');
                 }
             };
 
@@ -211,7 +211,7 @@
                     items: [...cart],
                     totalAmount: cartTotal
                 };
-                // 自動導入庫存扣除
+                // 庫存自動導入扣除邏輯
                 setProducts(prev => prev.map(p => {
                     const item = cart.find(ci => ci.id === p.id);
                     return item ? { ...p, stock: p.stock - item.quantity, onShelfCount: p.onShelfCount - item.quantity } : p;
@@ -219,7 +219,7 @@
                 setOrders([newOrder, ...orders]);
                 setCart([]);
                 setView('history');
-                alert('訂單提交成功！');
+                alert('訂單提交成功，庫存已自動扣除！');
             };
 
             const exportCSV = (order) => {
@@ -229,6 +229,7 @@
                     groupedItems[item.category].push(item);
                 });
 
+                // 報表日期與公司名稱單獨一列，滿足用戶需求
                 let csvRows = [
                     `報表日期,${order.date}`,
                     `公司名稱,${order.companyName || '個人'}`,
@@ -240,17 +241,18 @@
 
                 Object.keys(groupedItems).forEach(cat => {
                     csvRows.push(`--- 分類：${cat} ---`);
-                    csvRows.push('品名,單價,數量,小計');
+                    csvRows.push('品名,單價(批價),數量,小計');
                     groupedItems[cat].forEach(i => {
                         csvRows.push(`"${i.name}",${i.wholesalePrice},${i.quantity},${i.wholesalePrice * i.quantity}`);
                     });
                     csvRows.push('');
                 });
 
+                // 加入 UTF-8 BOM (\uFEFF) 確保 Excel 開啟中文不亂碼
                 const blob = new Blob(["\uFEFF" + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
-                link.download = `訂單報表_${order.customerName}_${order.date}.csv`;
+                link.download = `訂單_${order.customerName}_${order.date}.csv`;
                 link.click();
             };
 
@@ -261,11 +263,17 @@
                             <Smartphone size={40} />
                         </div>
                         <h1 className="text-3xl font-black text-slate-900 tracking-tighter italic">PetWise Pro</h1>
-                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">批發訂單管理系統</p>
-                        <form className="space-y-4" onSubmit={handleAuth}>
-                            <input className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold" placeholder="姓名 / 公司名" value={authInput.username} onChange={e=>setAuthInput({...authInput, username:e.target.value})} required />
-                            <input className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold" placeholder="管理密碼 (0000 編輯)" type="password" value={authInput.password} onChange={e=>setAuthInput({...authInput, password:e.target.value})} />
-                            <button type="submit" className="w-full py-5 bg-orange-600 text-white rounded-[2rem] font-black text-xl shadow-xl active:scale-95 transition-all">進入 App</button>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed">專業寵物批發訂單系統</p>
+                        <form className="space-y-4 text-left" onSubmit={handleAuth}>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 ml-4 uppercase">使用者</label>
+                                <input className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold" placeholder="姓名 / 公司" value={authInput.username} onChange={e=>setAuthInput({...authInput, username:e.target.value})} required />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 ml-4 uppercase">管理密碼 (0000)</label>
+                                <input className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold" placeholder="編輯價格請填寫" type="password" value={authInput.password} onChange={e=>setAuthInput({...authInput, password:e.target.value})} />
+                            </div>
+                            <button type="submit" className="w-full py-5 bg-orange-600 text-white rounded-[2rem] font-black text-xl shadow-xl active:scale-95 transition-all mt-4">進入系統</button>
                         </form>
                     </div>
                 </div>
@@ -283,7 +291,7 @@
                             {cart.length > 0 && view !== 'checkout' && (
                                 <button onClick={() => setView('cart')} className="relative p-2 bg-orange-50 text-orange-600 rounded-xl">
                                     <ShoppingCart size={22} />
-                                    <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">{cart.length}</span>
+                                    <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold border-2 border-white">{cart.length}</span>
                                 </button>
                             )}
                         </div>
@@ -294,7 +302,7 @@
                             <div className="scroll-container p-4 space-y-4">
                                 <div className="bg-white p-4 rounded-3xl border-2 border-slate-200 shadow-sm flex items-center gap-3">
                                     <Search className="text-slate-400 w-5 h-5" />
-                                    <input className="flex-1 bg-transparent font-bold outline-none text-sm" placeholder="搜尋想要的產品..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} />
+                                    <input className="flex-1 bg-transparent font-bold outline-none text-sm" placeholder="快速搜尋..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} />
                                 </div>
                                 <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
                                     {categories.map(cat => (
@@ -309,7 +317,7 @@
                                                     <p className="text-[9px] font-black text-orange-600 uppercase mb-1 tracking-widest">{p.category}</p>
                                                     <h3 className="font-bold text-slate-900 text-base leading-tight">{p.name}</h3>
                                                 </div>
-                                                <div className="text-right">
+                                                <div className="text-right shrink-0">
                                                     <p className="text-xl font-black text-slate-900">${p.wholesalePrice}</p>
                                                 </div>
                                             </div>
@@ -333,18 +341,20 @@
                                     <h2 className="text-2xl font-black text-slate-900 italic tracking-tighter">庫存盤點與編輯</h2>
                                     <button onClick={()=>setEditModal({id:`new-${Date.now()}`,category:'新分類',name:'',wholesalePrice:0,retailPrice:0,stock:0,onShelfCount:0})} className="p-3 bg-slate-900 text-white rounded-xl shadow-lg"><Plus /></button>
                                 </div>
-                                {products.map(p => (
-                                    <div key={p.id} onClick={()=>setEditModal(p)} className="bg-white p-5 rounded-[2rem] border-2 border-slate-200 shadow-sm border-l-8 border-l-orange-500 flex justify-between items-center active:scale-[0.98] transition-transform">
-                                        <div className="flex-1 mr-4">
-                                            <h3 className="font-bold text-slate-900 text-sm leading-tight">{p.name}</h3>
-                                            <p className="text-[10px] font-black text-slate-400 mt-2 uppercase">批價: ${p.wholesalePrice} / 零售: ${p.retailPrice}</p>
+                                <div className="grid gap-3 safe-pb">
+                                    {products.map(p => (
+                                        <div key={p.id} onClick={()=>setEditModal(p)} className="bg-white p-5 rounded-[2rem] border-2 border-slate-200 shadow-sm border-l-8 border-l-orange-500 flex justify-between items-center active:scale-[0.98] transition-transform">
+                                            <div className="flex-1 mr-4">
+                                                <h3 className="font-bold text-slate-900 text-sm leading-tight">{p.name}</h3>
+                                                <p className="text-[10px] font-black text-slate-400 mt-2 uppercase">批價: ${p.wholesalePrice} / 零售: ${p.retailPrice}</p>
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase leading-none mb-1">庫存 / 架上</p>
+                                                <p className="text-lg font-black text-slate-900 leading-none">{p.stock} / <span className="text-orange-600">{p.onShelfCount}</span></p>
+                                            </div>
                                         </div>
-                                        <div className="text-right shrink-0">
-                                            <p className="text-[10px] font-black text-slate-400 uppercase">庫存 / 架上</p>
-                                            <p className="text-lg font-black text-slate-900">{p.stock} / <span className="text-orange-600">{p.onShelfCount}</span></p>
-                                        </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
                         )}
 
@@ -363,9 +373,9 @@
                                                     <button onClick={()=>{
                                                         if(item.quantity > 1) setCart(cart.map(i=>i.id===item.id?{...i, quantity:i.quantity-1}:i));
                                                         else setCart(cart.filter(i=>i.id!==item.id));
-                                                    }} className="w-8 h-8 flex items-center justify-center text-slate-400"><Minus size={14}/></button>
+                                                    }} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors"><Minus size={14}/></button>
                                                     <span className="w-10 text-center font-black text-slate-900">{item.quantity}</span>
-                                                    <button onClick={()=>setCart(cart.map(i=>i.id===item.id?{...i, quantity:i.quantity+1}:i))} className="w-8 h-8 flex items-center justify-center text-slate-400"><Plus size={14}/></button>
+                                                    <button onClick={()=>setCart(cart.map(i=>i.id===item.id?{...i, quantity:i.quantity+1}:i))} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-orange-600 transition-colors"><Plus size={14}/></button>
                                                 </div>
                                             </div>
                                         ))}
@@ -374,30 +384,56 @@
                                 {cart.length > 0 && (
                                     <div className="fixed bottom-[110px] left-0 right-0 p-8 bg-white border-t-2 border-slate-100 shadow-2xl rounded-t-[4rem] z-40">
                                         <div className="flex justify-between items-center mb-6 px-4">
-                                            <span className="font-black text-slate-500 text-sm uppercase tracking-widest">總金額 (批價)</span>
+                                            <span className="font-black text-slate-500 text-sm uppercase tracking-widest">總計金額</span>
                                             <span className="text-4xl font-black text-slate-900">${cartTotal}</span>
                                         </div>
-                                        <button onClick={()=>setView('checkout')} className="w-full bg-orange-600 text-white py-6 rounded-[2.5rem] font-black text-xl shadow-2xl active:scale-95 transition-all">前往填寫結帳資訊</button>
+                                        <button onClick={()=>setView('checkout')} className="w-full bg-orange-600 text-white py-6 rounded-[2.5rem] font-black text-xl shadow-2xl active:scale-95 transition-all">下一步：填寫資訊</button>
                                     </div>
                                 )}
                             </div>
                         )}
 
                         {view === 'checkout' && (
-                            <div className="scroll-container p-6 space-y-6">
-                                <h2 className="text-2xl font-black text-slate-900 italic tracking-tighter">訂單資訊填寫</h2>
-                                <div className="grid gap-4 pb-40">
-                                    <input className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold" type="date" value={checkoutForm.date} onChange={e=>setCheckoutForm({...checkoutForm, date: e.target.value})} />
-                                    <input className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold" placeholder="公司 / 行號名稱 *" value={checkoutForm.companyName} onChange={e=>setCheckoutForm({...checkoutForm, companyName: e.target.value})} />
-                                    <input className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold" placeholder="收件人姓名 *" value={checkoutForm.customerName} onChange={e=>setCheckoutForm({...checkoutForm, customerName: e.target.value})} />
-                                    <input className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold" placeholder="聯絡電話 *" value={checkoutForm.phone} onChange={e=>setCheckoutForm({...checkoutForm, phone: e.target.value})} />
-                                    <input className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold" placeholder="完整配送地址" value={checkoutForm.address} onChange={e=>setCheckoutForm({...checkoutForm, address: e.target.value})} />
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <input className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold" placeholder="抬頭 (選填)" value={checkoutForm.taxTitle} onChange={e=>setCheckoutForm({...checkoutForm, taxTitle: e.target.value})} />
-                                        <input className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold" placeholder="統編 (選填)" value={checkoutForm.taxId} onChange={e=>setCheckoutForm({...checkoutForm, taxId: e.target.value})} />
+                            <div className="scroll-container p-6 space-y-6 pb-40">
+                                <h2 className="text-2xl font-black text-slate-900 italic tracking-tighter">結帳與配送資訊</h2>
+                                <div className="grid gap-5">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-slate-400 ml-4 uppercase">下單日期</label>
+                                        <input className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold" type="date" value={checkoutForm.date} onChange={e=>setCheckoutForm({...checkoutForm, date: e.target.value})} />
                                     </div>
-                                    <textarea className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold h-24" placeholder="備註（如運送時間需求等）..." value={checkoutForm.remarks} onChange={e=>setCheckoutForm({...checkoutForm, remarks: e.target.value})} />
-                                    <button onClick={submitOrder} className="w-full bg-slate-900 text-white py-5 rounded-[2.5rem] font-black text-xl shadow-2xl active:scale-95 transition-all">確認提交訂單</button>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-slate-400 ml-4 uppercase">公司 / 行號 *</label>
+                                        <input className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold" placeholder="請輸入完整公司名稱" value={checkoutForm.companyName} onChange={e=>setCheckoutForm({...checkoutForm, companyName: e.target.value})} />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-slate-400 ml-4 uppercase">聯絡人姓名 *</label>
+                                            <input className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold" placeholder="收件人" value={checkoutForm.customerName} onChange={e=>setCheckoutForm({...checkoutForm, customerName: e.target.value})} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-slate-400 ml-4 uppercase">聯絡電話 *</label>
+                                            <input className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold" placeholder="電話" value={checkoutForm.phone} onChange={e=>setCheckoutForm({...checkoutForm, phone: e.target.value})} />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-slate-400 ml-4 uppercase">配送地址</label>
+                                        <input className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold" placeholder="請輸入收貨地址" value={checkoutForm.address} onChange={e=>setCheckoutForm({...checkoutForm, address: e.target.value})} />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-slate-400 ml-4 uppercase">發票抬頭</label>
+                                            <input className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold" placeholder="選填" value={checkoutForm.taxTitle} onChange={e=>setCheckoutForm({...checkoutForm, taxTitle: e.target.value})} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-slate-400 ml-4 uppercase">統一編號</label>
+                                            <input className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold" placeholder="選填" value={checkoutForm.taxId} onChange={e=>setCheckoutForm({...checkoutForm, taxId: e.target.value})} />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-slate-400 ml-4 uppercase">訂單備註 (含運送時間需求)</label>
+                                        <textarea className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold h-24" placeholder="是否有特殊運送需求？" value={checkoutForm.remarks} onChange={e=>setCheckoutForm({...checkoutForm, remarks: e.target.value})} />
+                                    </div>
+                                    <button onClick={submitOrder} className="w-full bg-slate-900 text-white py-5 rounded-[2.5rem] font-black text-xl shadow-2xl active:scale-95 transition-all mt-4">確認並送出訂單</button>
                                 </div>
                             </div>
                         )}
@@ -405,13 +441,13 @@
                         {view === 'history' && (
                             <div className="scroll-container p-4 space-y-4">
                                 <h2 className="text-2xl font-black text-slate-900 italic tracking-tighter px-2">歷史報表紀錄</h2>
-                                {orders.length === 0 ? <div className="text-center py-20 text-slate-400 font-bold uppercase tracking-widest">目前沒有紀錄</div> : (
+                                {orders.length === 0 ? <div className="text-center py-20 text-slate-400 font-bold uppercase tracking-widest leading-loose">目前尚未有<br/>任何訂單紀錄</div> : (
                                     <div className="space-y-6 pb-20">
                                         {orders.map(o => (
                                             <div key={o.id} className="bg-white p-7 rounded-[3rem] border-2 border-slate-200 shadow-lg space-y-4">
                                                 <div className="flex justify-between items-start">
                                                     <div>
-                                                        <p className="text-[10px] font-black text-orange-600 mb-1 tracking-widest">{o.id}</p>
+                                                        <p className="text-[10px] font-black text-orange-600 mb-1 uppercase tracking-widest">{o.id}</p>
                                                         <h3 className="font-black text-slate-900 text-lg leading-tight">{o.companyName || '個人'} - {o.customerName}</h3>
                                                         <p className="text-[10px] font-bold text-slate-400 mt-1">{o.date}</p>
                                                     </div>
@@ -419,8 +455,8 @@
                                                         <p className="text-xl font-black text-slate-900">${o.totalAmount}</p>
                                                     </div>
                                                 </div>
-                                                <button onClick={() => exportCSV(o)} className="w-full py-4 bg-slate-100 text-slate-900 rounded-2xl font-black text-xs flex items-center justify-center gap-2 active:scale-95 transition-all">
-                                                    <FileSpreadsheet className="w-4 h-4" /> 下載 EXCEL 報表
+                                                <button onClick={() => exportCSV(o)} className="w-full py-4 bg-slate-100 text-slate-900 rounded-2xl font-black text-xs flex items-center justify-center gap-2 active:scale-95 transition-all hover:bg-slate-200">
+                                                    <FileSpreadsheet className="w-4 h-4" /> 下載 EXCEL (CSV)
                                                 </button>
                                             </div>
                                         ))}
@@ -435,7 +471,7 @@
                             <div className="bg-white w-full max-w-sm rounded-[3.5rem] p-10 space-y-6 shadow-2xl relative fade-in">
                                 <button onClick={() => setEditModal(null)} className="absolute top-8 right-8 text-slate-400 hover:text-red-500 transition-colors"><X size={24} /></button>
                                 <h3 className="font-black text-2xl text-slate-900 italic tracking-tighter">商品主檔維護</h3>
-                                <div className="space-y-4">
+                                <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 no-scrollbar">
                                     <div className="space-y-1">
                                         <p className="text-[10px] font-black text-slate-400 ml-3">分類</p>
                                         <input className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold" value={editModal.category} onChange={e=>setEditModal({...editModal, category: e.target.value})} />
@@ -450,17 +486,17 @@
                                             <input className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold" type="number" value={editModal.wholesalePrice} onChange={e=>setEditModal({...editModal, wholesalePrice: Number(e.target.value)})} />
                                         </div>
                                         <div className="space-y-1">
-                                            <p className="text-[10px] font-black text-slate-400 ml-3 uppercase">售價</p>
+                                            <p className="text-[10px] font-black text-slate-400 ml-3 uppercase">零售價</p>
                                             <input className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold" type="number" value={editModal.retailPrice} onChange={e=>setEditModal({...editModal, retailPrice: Number(e.target.value)})} />
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1">
-                                            <p className="text-[10px] font-black text-slate-400 ml-3 uppercase">總庫存</p>
+                                            <p className="text-[10px] font-black text-slate-400 ml-3 uppercase">庫存總量</p>
                                             <input className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold" type="number" value={editModal.stock} onChange={e=>setEditModal({...editModal, stock: Number(e.target.value)})} />
                                         </div>
                                         <div className="space-y-1">
-                                            <p className="text-[10px] font-black text-slate-400 ml-3 uppercase">架上</p>
+                                            <p className="text-[10px] font-black text-slate-400 ml-3 uppercase">架上數量</p>
                                             <input className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold" type="number" value={editModal.onShelfCount} onChange={e=>setEditModal({...editModal, onShelfCount: Number(e.target.value)})} />
                                         </div>
                                     </div>
@@ -471,7 +507,7 @@
                                         return exists ? prev.map(p => p.id === editModal.id ? editModal : p) : [...prev, editModal];
                                     });
                                     setEditModal(null);
-                                }} className="w-full py-5 bg-orange-600 text-white rounded-[3rem] font-black text-xl shadow-xl active:scale-95 transition-all">儲存並盤點庫存</button>
+                                }} className="w-full py-5 bg-orange-600 text-white rounded-[3rem] font-black text-xl shadow-xl active:scale-95 transition-all">更新商品資訊</button>
                             </div>
                         </div>
                     )}
